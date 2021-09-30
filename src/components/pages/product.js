@@ -12,22 +12,25 @@ function Product() {
   const productDispatch = useDispatch();
   const dataProducts = useSelector((state) => state.products);
   const dataProduct = useSelector((state) => state.product);
+  const [pro, setPro] = useState({});
   const [local, setlocal] = useState([]);
   const [from_local, setFrom] = useState([]);
   const [to_local, setTo] = useState([]);
   const [status, setStatus] = useState(['Not moved']);
   const [isFormSubmisitted, setIsFormSubitted] = useState(false);
-  const [id, setID] = useState();
+  const [id, setID] = useState([1]);
   const url = BASE_URL + '/product/' + id;
 
   useEffect(() => {
     productDispatch(fetchProducts());
-    console.log(dataProducts);
+    // console.log(dataProducts);
   }, []);
 
   useEffect(() => {
     productDispatch(fetchProduct(id));
-    // console.log(dataProduct);
+    setPro(dataProduct);
+    console.log(pro);
+    console.log(dataProduct);
   }, [id]);
 
   useEffect(() => {
@@ -64,36 +67,41 @@ function Product() {
       setFrom(moveLocation[2]);
       setTo(moveLocation[3]);
       setStatus(switchData());
-      console.log(local);
-      console.log(moveLocation);
+      // console.log(local);
+      // console.log(moveLocation);
     }
   }, [dataProduct?.location, dataProduct?.movelocation, local]);
 
   const [data, setData] = useState({
-    product_name: '',
-    product_image: '',
+    product_name: dataProduct.product_name,
+    product_image: dataProduct.product_image,
+    qty_in_stock: dataProduct.qty_in_stock,
     added_by: 1,
     location: [
       {
-        locate: '',
+        locate: local,
       },
     ],
     movelocation: [
       {
-        from_location: '',
+        from_location: local,
+        qty_to_be_moved: '',
         to_location: '',
-        status: '0',
+        status: '1',
       },
     ],
   });
 
   function handleInput(e) {
     const newdata = { ...data };
+    setIsFormSubitted(false);
     e.target.id === 'locate'
       ? (newdata.location[0][e.target.id] = e.target.value)
       : e.target.id === 'from_location'
       ? (newdata.movelocation[0][e.target.id] = e.target.value)
       : e.target.id === 'to_location'
+      ? (newdata.movelocation[0][e.target.id] = e.target.value)
+      : e.target.id === 'qty_to_be_moved'
       ? (newdata.movelocation[0][e.target.id] = e.target.value)
       : (newdata[e.target.id] = e.target.value);
     console.log(newdata);
@@ -107,26 +115,45 @@ function Product() {
 
   function submit(e) {
     console.log(data);
+
     setIsFormSubitted(true);
-    axios
-      .put(url, {
-        product_name: data.product_name,
-        product_image: data.product_image,
-        added_by: data.added_by,
-        location: data.location,
-        movelocation: data.movelocation,
-      })
-      .then((res) => {
-        setIsFormSubitted(false);
-        closeModel();
-        toast.success('Product Updated sucessfully');
-        console.log(res);
-      })
-      .catch((error) => {
-        setIsFormSubitted(false);
-        console.log(error);
-        closeModel();
-      });
+    if (data.movelocation[0].to_location === data.location[0].locate) {
+      closeModel();
+      toast.error('Destination Location should be different');
+    } else if (data.movelocation[0].qty_to_be_moved > data.qty_in_stock) {
+      closeModel();
+      toast.error('Quantity is more than available please reduce');
+    } else if (
+      data.movelocation[0].to_location !== null &&
+      data.movelocation[0].qty_to_be_moved !== null &&
+      data.movelocation[0].qty_to_be_moved < data.qty_in_stock
+    ) {
+      var qty = data.qty_in_stock - data.movelocation[0].qty_to_be_moved;
+      axios
+        .put(url, {
+          product_name: data.product_name,
+          product_image: data.product_image,
+          qty_in_stock: qty,
+          added_by: data.added_by,
+          location: [
+            {
+              locate: data.movelocation[0].to_location,
+            },
+          ],
+          movelocation: data.movelocation,
+        })
+        .then((res) => {
+          setIsFormSubitted(false);
+          closeModel();
+          toast.success('Product Updated sucessfully');
+          console.log(res);
+        })
+        .catch((error) => {
+          setIsFormSubitted(false);
+          console.log(error);
+          closeModel();
+        });
+    }
   }
 
   return (
@@ -152,7 +179,7 @@ function Product() {
                         Status
                       </th>
                       <th class='text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7'>
-                        Location
+                        Quantity
                       </th>
                       <th class='text-secondary opacity-7'></th>
                     </tr>
@@ -190,12 +217,12 @@ function Product() {
                             </td>
                             <td class='align-middle text-center text-sm'>
                               <span class='badge badge-sm bg-gradient-success'>
-                                Online
+                                loading...
                               </span>
                             </td>
                             <td class='align-middle text-center'>
                               <span class='text-secondary text-xs font-weight-bold'>
-                                Abuja
+                                {item?.qty_in_stock}
                               </span>
                             </td>
                             <td class='align-middle'>
@@ -301,7 +328,6 @@ function Product() {
                     onChange={(e) => handleInput(e)}
                   />
                 </div>
-                <label>Product Image</label>
                 <div class='mb-3'>
                   <input
                     type='text'
@@ -309,7 +335,19 @@ function Product() {
                     id='product_image'
                     value={dataProduct.product_image || data.product_image}
                     onChange={(e) => handleInput(e)}
-                    placeholder='name'
+                    placeholder='Please enter any text for image'
+                    aria-label='name'
+                  />
+                </div>
+                <label>Product Quantity</label>
+                <div class='mb-3'>
+                  <input
+                    type='text'
+                    class='form-control'
+                    id='qty_in_stock'
+                    value={data.qty_in_stock || dataProduct.qty_in_stock}
+                    onChange={(e) => handleInput(e)}
+                    placeholder='Quantity'
                     aria-label='name'
                   />
                 </div>
@@ -318,7 +356,7 @@ function Product() {
                   <input
                     type='text'
                     class='form-control'
-                    // value={data.location[0].locate}
+                    value={local}
                     onChange={(e) => handleInput(e)}
                     id='locate'
                     placeholder='location'
@@ -330,22 +368,34 @@ function Product() {
                   <input
                     type='text'
                     class='form-control'
-                    // value={data.movelocation[0].from_location}
+                    value={local}
                     onChange={(e) => handleInput(e)}
                     id='from_location'
                     placeholder='location'
                     aria-label='name'
                   />
                 </div>
-                <label>To</label>
+
                 <div class='mb-3'>
                   <input
                     type='text'
                     class='form-control'
-                    // value={data.movelocation[0].to_location}
+                    value={data.movelocation[0].qty_to_be_moved}
+                    onChange={(e) => handleInput(e)}
+                    id='qty_to_be_moved'
+                    placeholder='Quantity to be moved'
+                    aria-label='name'
+                  />
+                </div>
+
+                <div class='mb-3'>
+                  <input
+                    type='text'
+                    class='form-control'
+                    value={data.movelocation[0].to_location}
                     onChange={(e) => handleInput(e)}
                     id='to_location'
-                    placeholder='location'
+                    placeholder=' To location e.g Lagos'
                     aria-label='name'
                   />
                 </div>
